@@ -1,0 +1,53 @@
+{
+    "application": {
+        "name": "IP Operations Control Panel",
+        "version": "2.0.0",
+        "author": "Cybersecurity Operations",
+        "default_window_size": {
+            "width": 1920,
+            "height": 1080
+        }
+    },
+    "threat_intelligence": {
+        "default_threat_ip": "185.196.8.92",
+        "threat_ips": ["185.196.8.92"],
+        "auto_block_threats": false,
+        "threat_level_threshold": "HIGH"
+    },
+    "networking": {
+        "timeout": 5,
+        "max_retries": 3,
+        "port_scan_timeout": 1,
+        "traceroute_max_hops": 30,
+        "enable_packet_capture": false
+    },
+    "logging": {
+        "level": "INFO",
+        "max_file_size_mb": 10,
+        "backup_count": 5,
+        "log_to_file": true,
+        "log_to_console": true
+    },
+    "database": {
+        "enabled": true,
+        "path": "threat_intelligence.db",
+        "backup_interval_hours": 24
+    },
+    "ui": {
+        "theme": "dark",
+        "font_size": 12,
+        "auto_save": true,
+        "show_tooltips": true
+    },
+    "security": {
+        "require_confirmation": true,
+        "encrypt_logs": false,
+        "secure_delete": false
+    },
+    "monitoring": {
+        "enabled": true,
+        "check_interval_seconds": 60,
+        "alert_on_threat": true
+    }
+}
+
