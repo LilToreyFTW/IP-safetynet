@@ -2339,28 +2339,25 @@ class LaunchScreen:
     def __init__(self, root, callback):
         self.root = root
         self.callback = callback
-        self.root.title("Launch Screen")
+        self.root.title("Loading...")
         self.root.geometry("1920x1080")
         self.root.configure(bg='#000000')
         
         # Center the window
         self.center_window()
         
-        # Blinking state
-        self.blink_state = True
-        self.blink_labels = []
-        self.lt_label = None
-        self.animation_running = True
-        self.after_id = None
+        # Progress state
+        self.progress_value = 0
+        self.progress_running = True
         
         # Bind to window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        # Load and display image
+        # Load and display image with progress bar
         self.load_launch_image()
         
-        # Start blinking animation
-        self.blink_animation()
+        # Start progress bar animation
+        self.start_progress()
     
     def center_window(self):
         """Center the window on the screen"""
@@ -2372,295 +2369,164 @@ class LaunchScreen:
         self.root.geometry(f'{width}x{height}+{x}+{y}')
     
     def load_launch_image(self):
-        """Load and display the launch image with text overlays"""
+        """Load and display the launch image with progress bar"""
         try:
             image_path = os.path.join('software-gui-images', 'launchimage', 'launch_image.png')
             
-            if not os.path.exists(image_path):
-                # If image doesn't exist, create a placeholder
-                self.create_placeholder()
-                return
+            # Create main container
+            main_frame = tk.Frame(self.root, bg='#000000')
+            main_frame.pack(fill=tk.BOTH, expand=True)
             
-            # Load image
-            pil_image = Image.open(image_path)
+            # Image container
+            image_frame = tk.Frame(main_frame, bg='#000000')
+            image_frame.pack(fill=tk.BOTH, expand=True, pady=(50, 0))
             
-            # Resize to fit window while maintaining aspect ratio
-            screen_width = 1920
-            screen_height = 1080
-            pil_image.thumbnail((screen_width, screen_height), Image.Resampling.LANCZOS)
-            
-            # Convert to PhotoImage
-            self.photo = ImageTk.PhotoImage(pil_image)
-            
-            # Create canvas to display image
-            self.canvas = tk.Canvas(
-                self.root,
-                width=screen_width,
-                height=screen_height,
-                bg='#000000',
-                highlightthickness=0
-            )
-            self.canvas.pack(fill=tk.BOTH, expand=True)
-            
-            # Center the image on canvas
-            img_x = screen_width // 2
-            img_y = screen_height // 2
-            self.canvas.create_image(img_x, img_y, image=self.photo, anchor=tk.CENTER)
-            
-            # ADDED: Extract text from image or use manual positioning
-            # For now, we'll use OCR to detect text, or create text overlays
-            self.create_text_overlays()
-            
-        except Exception as e:
-            print(f"Error loading image: {e}")
-            self.create_placeholder()
-    
-    def create_text_overlays(self):
-        """Create text overlays on the image - words blink except LT in center"""
-        try:
-            # ADDED: Try to use OCR to detect text positions
-            # For now, we'll create a flexible system that can be adjusted
-            # You may need to adjust positions based on actual image content
-            
-            # Get image dimensions from canvas
-            canvas_width = 1920
-            canvas_height = 1080
-            
-            # Center position for "LT" (dead center - no blinking)
-            center_x = canvas_width // 2
-            center_y = canvas_height // 2
-            
-            # ADDED: Try OCR first to detect actual text in image
-            ocr_success = self.detect_text_with_ocr()
-            
-            # If OCR didn't work, create manual text overlays
-            if not ocr_success:
-                # ADDED: Create "LT" label in dead center (static, no blinking)
-                self.lt_label = self.canvas.create_text(
+            if os.path.exists(image_path):
+                # Load image
+                pil_image = Image.open(image_path)
+                
+                # Resize to fit window while maintaining aspect ratio
+                screen_width = 1920
+                screen_height = 900  # Leave space for progress bar
+                pil_image.thumbnail((screen_width - 100, screen_height - 100), Image.Resampling.LANCZOS)
+                
+                # Convert to PhotoImage
+                self.photo = ImageTk.PhotoImage(pil_image)
+                
+                # Create canvas to display image
+                self.canvas = tk.Canvas(
+                    image_frame,
+                    width=screen_width,
+                    height=screen_height,
+                    bg='#000000',
+                    highlightthickness=0
+                )
+                self.canvas.pack(fill=tk.BOTH, expand=True)
+                
+                # Center the image on canvas
+                img_x = screen_width // 2
+                img_y = screen_height // 2
+                self.canvas.create_image(img_x, img_y, image=self.photo, anchor=tk.CENTER)
+            else:
+                # Placeholder if image doesn't exist
+                self.canvas = tk.Canvas(
+                    image_frame,
+                    width=1920,
+                    height=900,
+                    bg='#000000',
+                    highlightthickness=0
+                )
+                self.canvas.pack(fill=tk.BOTH, expand=True)
+                
+                center_x = 1920 // 2
+                center_y = 900 // 2
+                self.canvas.create_text(
                     center_x,
                     center_y,
-                    text="LT",
-                    font=('Arial', 72, 'bold'),
+                    text="IP Operations Control Panel",
+                    font=('Arial', 48, 'bold'),
                     fill='#ffffff',
                     anchor=tk.CENTER
                 )
-                # ADDED: Create other text labels that will blink
-                # These positions can be adjusted based on your actual image
-                # Example positions (you may need to adjust these):
-                text_positions = [
-                    (center_x, center_y - 150, "TOP"),
-                    (center_x, center_y + 150, "BOTTOM"),
-                    (center_x - 200, center_y, "LEFT"),
-                    (center_x + 200, center_y, "RIGHT"),
-                    (center_x - 100, center_y - 100, "WORD1"),
-                    (center_x + 100, center_y - 100, "WORD2"),
-                    (center_x - 100, center_y + 100, "WORD3"),
-                    (center_x + 100, center_y + 100, "WORD4"),
-                ]
-                
-                # Create blinking text labels (all except LT)
-                for x, y, text in text_positions:
-                    label_id = self.canvas.create_text(
-                        x,
-                        y,
-                        text=text,
-                        font=('Arial', 36, 'bold'),
-                        fill='#ffffff',
-                        anchor=tk.CENTER
-                    )
-                    self.blink_labels.append(label_id)
             
-        except Exception as e:
-            print(f"Error creating text overlays: {e}")
-    
-    def detect_text_with_ocr(self):
-        """ADDED: Use OCR to detect text in the image and create overlays"""
-        try:
-            import pytesseract
+            # Progress bar container
+            progress_frame = tk.Frame(main_frame, bg='#000000')
+            progress_frame.pack(fill=tk.X, padx=200, pady=50)
             
-            image_path = os.path.join('software-gui-images', 'launchimage', 'launch_image.png')
-            if not os.path.exists(image_path):
-                return False
-            
-            # Get OCR data with bounding boxes
-            pil_image = Image.open(image_path)
-            ocr_data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT)
-            
-            # Check if we got any text
-            if not any(text.strip() for text in ocr_data['text']):
-                return False
-            
-            # Clear existing LT label if we're replacing it
-            if self.lt_label:
-                self.canvas.delete(self.lt_label)
-                self.lt_label = None
-            
-            # Scale factors for image positioning
-            screen_width = 1920
-            screen_height = 1080
-            img_width, img_height = pil_image.size
-            scale_x = screen_width / img_width
-            scale_y = screen_height / img_height
-            
-            center_x = screen_width // 2
-            center_y = screen_height // 2
-            
-            # Process OCR results
-            for i, text in enumerate(ocr_data['text']):
-                if text.strip():  # If text is not empty
-                    x = (ocr_data['left'][i] + ocr_data['width'][i] // 2) * scale_x
-                    y = (ocr_data['top'][i] + ocr_data['height'][i] // 2) * scale_y
-                    font_size = max(24, int(ocr_data['height'][i] * scale_y * 0.8))
-                    
-                    # Check if this is "LT" in the center (within tolerance)
-                    if text.strip().upper() == "LT":
-                        # Check if it's near center
-                        if abs(x - center_x) < 100 and abs(y - center_y) < 100:
-                            # This is the center LT - make it static
-                            if self.lt_label:
-                                self.canvas.coords(self.lt_label, x, y)
-                                self.canvas.itemconfig(self.lt_label, text=text.strip())
-                            else:
-                                self.lt_label = self.canvas.create_text(
-                                    x, y, text=text.strip(),
-                                    font=('Arial', font_size, 'bold'),
-                                    fill='#ffffff',
-                                    anchor=tk.CENTER
-                                )
-                        else:
-                            # LT not in center, make it blink
-                            label_id = self.canvas.create_text(
-                                x, y, text=text.strip(),
-                                font=('Arial', font_size, 'bold'),
-                                fill='#ffffff',
-                                anchor=tk.CENTER
-                            )
-                            self.blink_labels.append(label_id)
-                    else:
-                        # All other text blinks
-                        label_id = self.canvas.create_text(
-                            x, y, text=text.strip(),
-                            font=('Arial', font_size, 'bold'),
-                            fill='#ffffff',
-                            anchor=tk.CENTER
-                        )
-                        self.blink_labels.append(label_id)
-            
-            return True
-        except ImportError:
-            # pytesseract not installed, use manual positioning
-            print("OCR not available, using manual text positioning")
-            return False
-        except Exception as e:
-            print(f"OCR detection error: {e}")
-            return False
-    
-    def create_placeholder(self):
-        """Create placeholder if image not found"""
-        self.canvas = tk.Canvas(
-            self.root,
-            width=1920,
-            height=1080,
-            bg='#000000',
-            highlightthickness=0
-        )
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-        
-        center_x = 1920 // 2
-        center_y = 1080 // 2
-        
-        # Static "LT" in center
-        self.lt_label = self.canvas.create_text(
-            center_x,
-            center_y,
-            text="LT",
-            font=('Arial', 72, 'bold'),
-            fill='#ffffff',
-            anchor=tk.CENTER
-        )
-        
-        # Blinking words around it
-        words = ["WORD1", "WORD2", "WORD3", "WORD4"]
-        positions = [
-            (center_x, center_y - 150),
-            (center_x, center_y + 150),
-            (center_x - 200, center_y),
-            (center_x + 200, center_y)
-        ]
-        
-        for (x, y), word in zip(positions, words):
-            label_id = self.canvas.create_text(
-                x, y, text=word,
-                font=('Arial', 36, 'bold'),
-                fill='#ffffff',
-                anchor=tk.CENTER
+            # Progress bar label
+            self.progress_label = tk.Label(
+                progress_frame,
+                text="Loading...",
+                font=('Arial', 16),
+                bg='#000000',
+                fg='#ffffff'
             )
-            self.blink_labels.append(label_id)
+            self.progress_label.pack(pady=(0, 10))
+            
+            # Progress bar
+            self.progress_bar = ttk.Progressbar(
+                progress_frame,
+                length=1520,  # 1920 - 400 (padding)
+                mode='determinate',
+                maximum=100
+            )
+            self.progress_bar.pack(fill=tk.X)
+            
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            # Create simple placeholder
+            label = tk.Label(
+                self.root,
+                text="IP Operations Control Panel\nLoading...",
+                font=('Arial', 36, 'bold'),
+                bg='#000000',
+                fg='#ffffff'
+            )
+            label.pack(fill=tk.BOTH, expand=True)
     
-    def blink_animation(self):
-        """Animate blinking text (all except LT)"""
-        # Check if window still exists and animation should continue
-        if not self.animation_running:
+    def start_progress(self):
+        """Start the progress bar animation"""
+        self.progress_value = 0
+        self.progress_running = True
+        self.update_progress()
+    
+    def update_progress(self):
+        """Update progress bar"""
+        if not self.progress_running:
             return
         
         try:
-            # Check if root window still exists
             if not self.root.winfo_exists():
-                self.animation_running = False
+                self.progress_running = False
                 return
             
-            # Toggle blink state
-            self.blink_state = not self.blink_state
+            # Update progress value
+            self.progress_value += 2  # Increase by 2% each update
             
-            # Update all blinking labels
-            for label_id in self.blink_labels:
-                try:
-                    if self.blink_state:
-                        self.canvas.itemconfig(label_id, fill='#ffffff')
-                    else:
-                        self.canvas.itemconfig(label_id, fill='#000000')  # Invisible
-                except tk.TclError:
-                    # Canvas or item no longer exists
-                    self.animation_running = False
-                    return
+            if self.progress_value > 100:
+                self.progress_value = 100
             
-            # Schedule next blink (500ms interval) only if still running
-            if self.animation_running:
-                self.after_id = self.root.after(500, self.blink_animation)
+            # Update progress bar
+            if hasattr(self, 'progress_bar'):
+                self.progress_bar['value'] = self.progress_value
             
-            # ADDED: Auto-close after 3 seconds and show main GUI (only schedule once)
-            if not hasattr(self, 'close_scheduled'):
-                self.close_scheduled = True
-                self.root.after(3000, self.close_and_show_main)
+            # Update label
+            if hasattr(self, 'progress_label'):
+                if self.progress_value < 30:
+                    self.progress_label.config(text="Initializing...")
+                elif self.progress_value < 60:
+                    self.progress_label.config(text="Loading modules...")
+                elif self.progress_value < 90:
+                    self.progress_label.config(text="Preparing interface...")
+                else:
+                    self.progress_label.config(text="Almost ready...")
+            
+            # Continue updating or close
+            if self.progress_value >= 100:
+                # Wait a moment then close
+                self.root.after(500, self.close_and_show_main)
+            else:
+                # Schedule next update (30ms for smooth animation)
+                self.root.after(30, self.update_progress)
+                
         except tk.TclError:
             # Window was destroyed
-            self.animation_running = False
+            self.progress_running = False
             return
         except Exception as e:
-            # Any other error - stop animation
-            print(f"Animation error: {e}")
-            self.animation_running = False
+            print(f"Progress update error: {e}")
+            self.progress_running = False
             return
     
     def on_closing(self):
         """Handle window closing event"""
-        self.animation_running = False
-        if self.after_id:
-            try:
-                self.root.after_cancel(self.after_id)
-            except:
-                pass
+        self.progress_running = False
         self.close_and_show_main()
     
     def close_and_show_main(self):
         """Close launch screen and show main GUI"""
-        # Stop animation before destroying window
-        self.animation_running = False
-        if self.after_id:
-            try:
-                self.root.after_cancel(self.after_id)
-            except:
-                pass
+        # Stop progress before destroying window
+        self.progress_running = False
         
         # Destroy window
         try:
